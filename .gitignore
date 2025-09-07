@@ -1,0 +1,6 @@
+data/*
+*__pycache__*
+*.png
+*.pth
+*.pkl
+test.py
