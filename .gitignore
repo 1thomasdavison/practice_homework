@@ -4,3 +4,5 @@ data/*
 *.pth
 *.pkl
 test.py
+test_api.py
+test_font.py
