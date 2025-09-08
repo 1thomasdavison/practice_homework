@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D气囊系统实时监控</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: linear-gradient(135deg, #1a2a6c, #b21f1f, #fdbb2d);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+        .header {
+            text-align: center;
+            padding: 15px;
+            color: white;
+            background: rgba(0, 0, 0, 0.3);
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 2.2rem;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+        }
+        .header p {
+            margin: 8px 0 0;
+            font-size: 1.1rem;
+        }
+        .container {
+            flex: 1;
+            display: flex;
+        }
+        #canvas-container {
+            flex: 1;
+            position: relative;
+        }
+        .instructions {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.8);
+            padding: 12px 18px;
+            border-radius: 10px;
+            font-size: 14px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            max-width: 300px;
+        }
+        .instructions h3 {
+            margin: 0 0 8px 0;
+            color: #1a2a6c;
+        }
+        .instructions ul {
+            margin: 0;
+            padding-left: 20px;
+        }
+        .instructions li {
+            margin-bottom: 5px;
+        }
+        .coordinates {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 12px 15px;
+            border-radius: 8px;
+            font-size: 14px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            min-width: 180px;
+        }
+        .coordinates div {
+            margin: 5px 0;
+        }
+        .controls {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 12px 15px;
+            border-radius: 8px;
+            font-size: 14px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+        .controls button {
+            margin-top: 10px;
+            padding: 8px 15px;
+            background: #1a2a6c;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            display: block;
+            width: 100%;
+        }
+        .controls button:hover {
+            background: #0d1a4a;
+        }
+        .controls .slider-container {
+            margin-top: 10px;
+        }
+        .controls label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        .controls input[type="range"] {
+            width: 100%;
+        }
+        #status-bar {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.6);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 5px;
+            font-size: 13px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>3D气囊系统实时监控</h1>
+        <p>横坐标: 0-40 | 纵坐标: 0-26 | 左上角为原点(0,0)</p>
+    </div>
+    
+    <div class="container">
+        <div id="canvas-container"></div>
+        
+        <div class="instructions">
+            <h3>操作指南</h3>
+            <ul>
+                <li><strong>鼠标左键拖动</strong>: 旋转视角</li>
+                <li><strong>鼠标滚轮</strong>: 缩放视图</li>
+                <li><strong>鼠标右键拖动</strong>: 平移视图</li>
+                <li><strong>双击网格</strong>: 重置视图</li>
+                <li><strong>压力矩阵</strong>: 实时更新</li>
+                <li><strong>非线性响应</strong>: 压力越大，高度下降越快</li>
+            </ul>
+        </div>
+        
+        <div class="coordinates">
+            <div>当前视角: <span id="camera-position">(0, 0, 0)</span></div>
+            <div>网格尺寸: 40 × 26</div>
+            <div>气囊颜色: 淡蓝色</div>
+            <div>初始高度: <span id="initial-height">3.0</span></div>
+            <div>压力灵敏度: <span id="sensitivity">0.15</span></div>
+            <div>数据时间: <span id="data-time">--:--:--</span></div>
+            <div>平均压力: <span id="avg-pressure">0</span></div>
+            <div>姿态: <span id="posture">未知</span></div>
+        </div>
+        
+        <div class="controls">
+            <div>系统控制:</div>
+            <button id="connect-btn">连接服务器</button>
+            <button id="random-pressure">随机测试</button>
+            <button id="reset-pressure">重置压力</button>
+            
+            <div class="slider-container">
+                <label for="initial-height-slider">初始高度: <span id="initial-height-value">3.0</span></label>
+                <input type="range" id="initial-height-slider" min="1" max="5" step="0.1" value="3.0">
+            </div>
+            
+            <div class="slider-container">
+                <label for="sensitivity-slider">压力灵敏度: <span id="sensitivity-value">0.15</span></label>
+                <input type="range" id="sensitivity-slider" min="0.05" max="0.3" step="0.01" value="0.15">
+            </div>
+        </div>
+        
+        <div id="status-bar">状态: 等待连接...</div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/controls/OrbitControls.js"></script>
+    
+    <script>
+        // 初始化场景
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xf0f8ff);
+        
+        // 初始化相机
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(20, 30, 40);
+        
+        // 初始化渲染器
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight - 80);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        document.getElementById('canvas-container').appendChild(renderer.domElement);
+        
+        // 添加轨道控制器
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        
+        // 添加光源
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        scene.add(ambientLight);
+        
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        directionalLight.position.set(10, 20, 15);
+        scene.add(directionalLight);
+        
+        // 创建网格平面
+        const gridSizeX = 40;
+        const gridSizeY = 26;
+        
+        // 创建网格线
+        const gridMaterial = new THREE.LineBasicMaterial({ color: 0x0000ff });
+        
+        // 横线 (X方向)
+        for (let y = 0; y <= gridSizeY; y++) {
+            const points = [];
+            points.push(new THREE.Vector3(0, 0, -y));
+            points.push(new THREE.Vector3(gridSizeX, 0, -y));
+            
+            const geometry = new THREE.BufferGeometry().setFromPoints(points);
+            const line = new THREE.Line(geometry, gridMaterial);
+            scene.add(line);
+        }
+        
+        // 竖线 (Y方向)
+        for (let x = 0; x <= gridSizeX; x++) {
+            const points = [];
+            points.push(new THREE.Vector3(x, 0, 0));
+            points.push(new THREE.Vector3(x, 0, -gridSizeY));
+            
+            const geometry = new THREE.BufferGeometry().setFromPoints(points);
+            const line = new THREE.Line(geometry, gridMaterial);
+            scene.add(line);
+        }
+        
+        // 添加坐标标签
+        const createLabel = (text, x, y, z) => {
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            canvas.width = 64;
+            canvas.height = 32;
+            
+            context.fillStyle = 'rgba(0, 0, 0, 0.8)';
+            context.fillRect(0, 0, canvas.width, canvas.height);
+            
+            context.font = 'bold 14px Arial';
+            context.fillStyle = 'white';
+            context.textAlign = 'center';
+            context.textBaseline = 'middle';
+            context.fillText(text, canvas.width/2, canvas.height/2);
+            
+            const texture = new THREE.CanvasTexture(canvas);
+            const material = new THREE.SpriteMaterial({ map: texture });
+            const sprite = new THREE.Sprite(material);
+            sprite.position.set(x, 1, z);
+            sprite.scale.set(4, 2, 1);
+            scene.add(sprite);
+        };
+        
+        // 添加X轴标签
+        for (let x = 0; x <= gridSizeX; x += 10) {
+            createLabel(`X:${x}`, x, 0, 1);
+        }
+        
+        // 添加Y轴标签
+        for (let y = 0; y <= gridSizeY; y += 5) {
+            createLabel(`Y:${y}`, -1, 0, -y);
+        }
+        
+        // 添加原点标签
+        createLabel('(0,0)', -1, 0, 1);
+        
+        // 几何体存储对象
+        const sceneObjects = {
+            cubes: [],
+            cylinders: []
+        };
+        
+        // 压力矩阵存储
+        let pressureMatrix = null;
+        
+        // 气囊系统参数
+        const airbagParams = {
+            initialHeight: 3.0, // 初始高度增加
+            minHeight: 0.5,     // 最小高度
+            sensitivity: 0.15,  // 压力灵敏度
+            maxDeformation: 2.5 // 最大变形量
+        };
+        
+        // 添加立方体函数
+        const addCube = (id, topLeft, bottomRight, height = airbagParams.initialHeight) => {
+            const x1 = topLeft[0];
+            const y1 = topLeft[1];
+            const x2 = bottomRight[0];
+            const y2 = bottomRight[1];
+            
+            // 计算立方体尺寸
+            const width = Math.abs(x2 - x1);
+            const depth = Math.abs(y2 - y1);
+            
+            // 计算立方体中心位置
+            const centerX = (x1 + x2) / 2;
+            const centerZ = -(y1 + y2) / 2; // 注意：Y坐标转换为Z轴负方向
+            
+            // 创建立方体
+            const geometry = new THREE.BoxGeometry(width, height, depth);
+            const material = new THREE.MeshPhongMaterial({ 
+                color: 0xADD8E6, // 淡蓝色
+                transparent: true,
+                opacity: 0.7
+            });
+            const cube = new THREE.Mesh(geometry, material);
+            
+            // 设置立方体位置（高度为height/2，使底部在平面上）
+            cube.position.set(centerX, height/2, centerZ);
+            
+            scene.add(cube);
+            
+            // 添加边框
+            const edges = new THREE.EdgesGeometry(geometry);
+            const line = new THREE.LineSegments(
+                edges,
+                new THREE.LineBasicMaterial({ color: 0x000000 })
+            );
+            line.position.copy(cube.position);
+            scene.add(line);
+            
+            // 存储对象信息
+            const obj = {
+                id: id,
+                mesh: cube,
+                border: line,
+                height: height,
+                type: 'cube',
+                topLeft: topLeft,
+                bottomRight: bottomRight
+            };
+            
+            sceneObjects.cubes.push(obj);
+            return obj;
+        };
+        
+        // 添加圆柱体函数
+        const addCylinder = (id, x, y, height = airbagParams.initialHeight, radius = 1.5) => {
+            const geometry = new THREE.CylinderGeometry(radius, radius, height, 32);
+            const material = new THREE.MeshPhongMaterial({ 
+                color: 0xADD8E6, // 淡蓝色
+                transparent: true,
+                opacity: 0.7
+            });
+            const cylinder = new THREE.Mesh(geometry, material);
+            
+            // 设置圆柱体位置（高度为height/2，使底部在平面上）
+            cylinder.position.set(x, height/2, -y);
+            
+            scene.add(cylinder);
+            
+            // 添加边框
+            const edges = new THREE.EdgesGeometry(geometry);
+            const line = new THREE.LineSegments(
+                edges,
+                new THREE.LineBasicMaterial({ color: 0x000000 })
+            );
+            line.position.copy(cylinder.position);
+            scene.add(line);
+            
+            // 存储对象信息
+            const obj = {
+                id: id,
+                mesh: cylinder,
+                border: line,
+                height: height,
+                type: 'cylinder',
+                position: {x: x, y: y}
+            };
+            
+            sceneObjects.cylinders.push(obj);
+            return obj;
+        };
+        
+        // 添加立方体（根据您提供的坐标）
+        sceneObjects.cubes.push(
+            addCube('cube1', [1, 4], [3, 23]),
+            addCube('cube2', [5, 4], [7, 23]),
+            addCube('cube3', [9, 4], [11, 23]),
+            addCube('cube4', [38, 4], [40, 23])
+        );
+        
+        // 添加圆柱体（5列×6行）
+        const startX = 13;
+        const endX = 35;
+        const startY = 0;
+        const endY = 26;
+        
+        const cols = 5; // 列数（横坐标方向）
+        const rows = 6; // 行数（纵坐标方向）
+        
+        // 计算间距
+        const colSpacing = (endX - startX) / (cols - 1);
+        const rowSpacing = (endY - startY) / (rows - 1);
+        
+        // 添加圆柱体
+        let cylinderCount = 1;
+        for (let col = 0; col < cols; col++) {
+            for (let row = 0; row < rows; row++) {
+                const x = startX + col * colSpacing;
+                const y = startY + row * rowSpacing;
+                sceneObjects.cylinders.push(addCylinder(`cylinder${cylinderCount}`, x, y));
+                cylinderCount++;
+            }
+        }
+        
+        // 添加边界
+        const addBorder = (points, color) => {
+            const material = new THREE.LineBasicMaterial({ color: color, linewidth: 2 });
+            const geometry = new THREE.BufferGeometry().setFromPoints(points);
+            const line = new THREE.Line(geometry, material);
+            scene.add(line);
+        };
+        
+        // 顶部边框
+        addBorder([
+            new THREE.Vector3(0, 0.2, 0),
+            new THREE.Vector3(gridSizeX, 0.2, 0)
+        ], 0xff0000);
+        
+        // 左侧边框
+        addBorder([
+            new THREE.Vector3(0, 0.2, 0),
+            new THREE.Vector3(0, 0.2, -gridSizeY)
+        ], 0xff0000);
+        
+        // 高度修改接口
+        window.setObjectHeight = function(id, height) {
+            // 查找立方体
+            for (const cube of sceneObjects.cubes) {
+                if (cube.id === id) {
+                    updateObjectHeight(cube, height);
+                    return;
+                }
+            }
+            
+            // 查找圆柱体
+            for (const cylinder of sceneObjects.cylinders) {
+                if (cylinder.id === id) {
+                    updateObjectHeight(cylinder, height);
+                    return;
+                }
+            }
+            
+            console.warn(`未找到ID为 ${id} 的几何体`);
+        };
+        
+        // 更新几何体高度
+        function updateObjectHeight(obj, height) {
+            // 更新高度值
+            obj.height = height;
+            
+            // 更新位置（高度为height/2，使底部在平面上）
+            obj.mesh.position.y = height / 2;
+            obj.border.position.y = height / 2;
+            
+            // 重新创建几何体以更新高度
+            if (obj.type === 'cube') {
+                // 对于立方体，需要重新计算尺寸
+                const width = obj.mesh.geometry.parameters.width;
+                const depth = obj.mesh.geometry.parameters.depth;
+                
+                // 创建新几何体
+                const newGeometry = new THREE.BoxGeometry(width, height, depth);
+                obj.mesh.geometry.dispose();
+                obj.mesh.geometry = newGeometry;
+                
+                // 更新边框
+                const edges = new THREE.EdgesGeometry(newGeometry);
+                obj.border.geometry.dispose();
+                obj.border.geometry = edges;
+            } else if (obj.type === 'cylinder') {
+                // 对于圆柱体
+                const radius = obj.mesh.geometry.parameters.radiusTop;
+                
+                // 创建新几何体
+                const newGeometry = new THREE.CylinderGeometry(radius, radius, height, 32);
+                obj.mesh.geometry.dispose();
+                obj.mesh.geometry = newGeometry;
+                
+                // 更新边框
+                const edges = new THREE.EdgesGeometry(newGeometry);
+                obj.border.geometry.dispose();
+                obj.border.geometry = edges;
+            }
+        }
+        
+        // 压力矩阵接口
+        window.updatePressureMatrix = function(matrix) {
+            // 存储压力矩阵
+            pressureMatrix = matrix;
+            
+            // 更新所有几何体高度
+            updateAllHeightsFromPressure();
+        };
+        
+        // 从压力矩阵更新所有几何体高度
+        function updateAllHeightsFromPressure() {
+            if (!pressureMatrix) return;
+            
+            // 更新立方体高度
+            for (const cube of sceneObjects.cubes) {
+                const avgPressure = calculateCubePressure(cube);
+                // 非线性响应：压力越大，高度下降越快
+                const newHeight = calculateNonlinearHeight(avgPressure);
+                updateObjectHeight(cube, newHeight);
+            }
+            
+            // 更新圆柱体高度
+            for (const cylinder of sceneObjects.cylinders) {
+                const avgPressure = calculateCylinderPressure(cylinder);
+                // 非线性响应：压力越大，高度下降越快
+                const newHeight = calculateNonlinearHeight(avgPressure);
+                updateObjectHeight(cylinder, newHeight);
+            }
+        }
+        
+        // 计算非线性高度（气囊特性）
+        function calculateNonlinearHeight(pressure) {
+            // 非线性公式：初始高度 - (1 - e^(-压力 * 灵敏度)) * 最大变形量
+            const deformation = (1 - Math.exp(-pressure * airbagParams.sensitivity)) * airbagParams.maxDeformation;
+            const newHeight = airbagParams.initialHeight - deformation;
+            
+            // 确保高度不低于最小值
+            return Math.max(airbagParams.minHeight, newHeight);
+        }
+        
+        // 计算立方体覆盖区域的平均压力
+        function calculateCubePressure(cube) {
+            if (!pressureMatrix) return 0;
+            
+            const x1 = Math.floor(cube.topLeft[0]);
+            const y1 = Math.floor(cube.topLeft[1]);
+            const x2 = Math.floor(cube.bottomRight[0]);
+            const y2 = Math.floor(cube.bottomRight[1]);
+            
+            let totalPressure = 0;
+            let count = 0;
+            
+            // 遍历立方体覆盖的网格点
+            for (let x = x1; x <= x2; x++) {
+                for (let y = y1; y <= y2; y++) {
+                    // 确保坐标在矩阵范围内
+                    if (x >= 0 && x < pressureMatrix.length && 
+                        y >= 0 && y < pressureMatrix[0].length) {
+                        totalPressure += pressureMatrix[x][y];
+                        count++;
+                    }
+                }
+            }
+            
+            return count > 0 ? totalPressure / count : 0;
+        }
+        
+        // 计算圆柱体覆盖区域的平均压力
+        function calculateCylinderPressure(cylinder) {
+            if (!pressureMatrix) return 0;
+            
+            const x = Math.floor(cylinder.position.x);
+            const y = Math.floor(cylinder.position.y);
+            
+            // 圆柱体覆盖3x3区域
+            let totalPressure = 0;
+            let count = 0;
+            
+            for (let dx = -1; dx <= 1; dx++) {
+                for (let dy = -1; dy <= 1; dy++) {
+                    const px = x + dx;
+                    const py = y + dy;
+                    
+                    // 确保坐标在矩阵范围内
+                    if (px >= 0 && px < pressureMatrix.length && 
+                        py >= 0 && py < pressureMatrix[0].length) {
+                        totalPressure += pressureMatrix[px][py];
+                        count++;
+                    }
+                }
+            }
+            
+            return count > 0 ? totalPressure / count : 0;
+        }
+        
+        // 创建随机压力矩阵
+        function createRandomPressureMatrix() {
+            const matrix = [];
+            
+            // 创建40x26的压力矩阵
+            for (let x = 0; x <= gridSizeX; x++) {
+                matrix[x] = [];
+                for (let y = 0; y <= gridSizeY; y++) {
+                    // 随机压力值在0-15之间
+                    matrix[x][y] = Math.random() * 15;
+                }
+            }
+            
+            return matrix;
+        }
+        
+        // 重置压力矩阵（所有压力为0）
+        function resetPressureMatrix() {
+            const matrix = [];
+            
+            for (let x = 0; x <= gridSizeX; x++) {
+                matrix[x] = [];
+                for (let y = 0; y <= gridSizeY; y++) {
+                    matrix[x][y] = 0;
+                }
+            }
+            
+            return matrix;
+        }
+        
+        // 更新UI显示
+        function updateUI() {
+            document.getElementById('initial-height').textContent = airbagParams.initialHeight.toFixed(1);
+            document.getElementById('sensitivity').textContent = airbagParams.sensitivity.toFixed(2);
+            document.getElementById('initial-height-value').textContent = airbagParams.initialHeight.toFixed(1);
+            document.getElementById('sensitivity-value').textContent = airbagParams.sensitivity.toFixed(2);
+        }
+        
+        // WebSocket连接和数据处理
+        let ws = null;
+        
+        function connectWebSocket() {
+            // 关闭现有连接
+            if (ws) {
+                ws.close();
+            }
+            
+            // 更新状态
+            updateStatus('正在连接服务器...', 'connecting');
+            
+            // 创建新的WebSocket连接
+            ws = new WebSocket('ws://127.0.0.1:8000');
+            
+            ws.onopen = function() {
+                updateStatus('已连接到服务器', 'connected');
+                console.log('WebSocket连接已建立');
+            };
+            
+            ws.onmessage = function(event) {
+                try {
+                    const data = JSON.parse(event.data);
+                    processSensorData(data);
+                } catch (error) {
+                    console.error('解析数据出错:', error);
+                }
+            };
+            
+            ws.onerror = function(error) {
+                console.error('WebSocket错误:', error);
+                updateStatus('连接出错', 'error');
+            };
+            
+            ws.onclose = function() {
+                console.log('WebSocket连接已关闭');
+                updateStatus('连接已断开', 'disconnected');
+            };
+        }
+        
+        function processSensorData(data) {
+            // 更新UI数据
+            document.getElementById('data-time').textContent = data.time.split(' ')[1];
+            document.getElementById('avg-pressure').textContent = data.avg_pressure;
+            document.getElementById('posture').textContent = data.posture === 'no' ? '正常' : '异常';
+            
+            // 处理压力矩阵数据
+            try {
+                // 将字符串形式的数组解析为实际数组
+                const pressureArray = JSON.parse(data.pressure);
+                
+                // 将一维数组转换为二维矩阵 (40x26)
+                const matrix = [];
+                const rows = 40;
+                const cols = 26;
+                
+                for (let i = 0; i < rows; i++) {
+                    matrix[i] = [];
+                    for (let j = 0; j < cols; j++) {
+                        matrix[i][j] = pressureArray[i * cols + j] || 0;
+                    }
+                }
+                
+                // 更新3D场景
+                updatePressureMatrix(matrix);
+                
+                // 更新状态时间
+                updateStatus(`数据接收: ${data.time}`, 'receiving');
+                
+            } catch (error) {
+                console.error('处理压力数据时出错:', error);
+                updateStatus('数据格式错误', 'error');
+            }
+        }
+        
+        function updateStatus(message, statusClass) {
+            const statusBar = document.getElementById('status-bar');
+            statusBar.textContent = `状态: ${message}`;
+            
+            // 移除所有状态类
+            statusBar.classList.remove('connected', 'error', 'connecting', 'disconnected', 'receiving');
+            
+            // 添加当前状态类
+            if (statusClass) {
+                statusBar.classList.add(statusClass);
+            }
+        }
+        
+        // 应用随机压力测试按钮
+        document.getElementById('random-pressure').addEventListener('click', () => {
+            const randomMatrix = createRandomPressureMatrix();
+            updatePressureMatrix(randomMatrix);
+            updateStatus('正在使用随机测试数据', 'test');
+        });
+        
+        // 重置压力矩阵按钮
+        document.getElementById('reset-pressure').addEventListener('click', () => {
+            const zeroMatrix = resetPressureMatrix();
+            updatePressureMatrix(zeroMatrix);
+            updateStatus('压力已重置', 'reset');
+        });
+        
+        // 连接服务器按钮
+        document.getElementById('connect-btn').addEventListener('click', connectWebSocket);
+        
+        // 初始高度滑块
+        document.getElementById('initial-height-slider').addEventListener('input', (e) => {
+            airbagParams.initialHeight = parseFloat(e.target.value);
+            updateUI();
+            
+            // 重置所有几何体高度
+            const zeroMatrix = resetPressureMatrix();
+            updatePressureMatrix(zeroMatrix);
+        });
+        
+        // 灵敏度滑块
+        document.getElementById('sensitivity-slider').addEventListener('input', (e) => {
+            airbagParams.sensitivity = parseFloat(e.target.value);
+            updateUI();
+            
+            // 重新计算高度
+            if (pressureMatrix) {
+                updateAllHeightsFromPressure();
+            }
+        });
+        
+        // 动画循环
+        const animate = () => {
+            requestAnimationFrame(animate);
+            controls.update();
+            
+            // 更新相机位置显示
+            const pos = camera.position;
+            document.getElementById('camera-position').textContent = 
+                `(${pos.x.toFixed(1)}, ${pos.y.toFixed(1)}, ${pos.z.toFixed(1)})`;
+            
+            renderer.render(scene, camera);
+        };
+        
+        // 窗口大小调整
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / (window.innerHeight - 80);
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight - 80);
+        });
+        
+        // 双击重置视图
+        renderer.domElement.addEventListener('dblclick', () => {
+            controls.reset();
+        });
+        
+        // 初始化UI
+        updateUI();
+        
+        // 初始化压力矩阵
+        updatePressureMatrix(resetPressureMatrix());
+        
+        // 初始化状态
+        updateStatus('准备连接服务器', 'disconnected');
+        
+        animate();
+    </script>
+</body>
+</html>
